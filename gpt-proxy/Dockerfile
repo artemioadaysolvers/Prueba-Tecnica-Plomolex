@@ -1,8 +1,17 @@
-FROM python:3.11-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Usamos una imagen base de Python
+FROM python:3.9-slim
+
+# Establecemos el directorio de trabajo
 WORKDIR /app
-COPY requirements.txt .
+
+# Copiamos todo el contenido de la carpeta gpt-proxy al contenedor
+COPY . .
+
+# Instalamos las dependencias
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app ./app
-ENV PORT=8080
+
+# Exponemos el puerto donde se ejecutará el servidor
+EXPOSE 8080
+
+# Comando para ejecutar el servidor FastAPI
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
