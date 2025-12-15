@@ -2,6 +2,7 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
+  # Build con contexto gpt-proxy/ (incluye static/index.html)
   - name: gcr.io/cloud-builders/docker
     dir: gpt-proxy
     args:
@@ -10,8 +11,7 @@ steps:
       - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/gpt-proxy:$COMMIT_SHA
       - .
 
-  # (Cloud Build pushea automáticamente lo de "images:")
-
+  # Deploy automático al servicio correcto
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     args:
       - gcloud
