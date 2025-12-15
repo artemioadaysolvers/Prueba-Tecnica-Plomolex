@@ -4,7 +4,7 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # IMPORTANTE: aquí debe existir la carpeta app/
-WORKDIR /app/gpt-proxy
+WORKDIR /gpt-proxy/app
 
 ENV PORT=8080
 EXPOSE 8080
