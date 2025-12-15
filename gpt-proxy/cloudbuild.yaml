@@ -10,6 +10,21 @@ steps:
       - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/gpt-proxy:$COMMIT_SHA
       - .
 
+  # (Cloud Build pushea automáticamente lo de "images:")
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    args:
+      - gcloud
+      - run
+      - deploy
+      - gpt-proxy-github
+      - --image
+      - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/gpt-proxy:$COMMIT_SHA
+      - --region
+      - us-central1
+      - --platform
+      - managed
+      - --allow-unauthenticated
+
 images:
   - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/gpt-proxy:$COMMIT_SHA
-
