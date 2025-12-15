@@ -15,19 +15,19 @@ import io
 # Configuración
 # -------------------------------------------------
 MODEL = os.getenv("MODEL", "gpt-4.1-mini")
-MAX_REQ_BYTES = 32 * 1024 * 1024  # 32 MiB
+MAX_REQ_BYTES = 32 * 1024 * 1024   # 32 MiB
 MAX_PDF_TEXT_CHARS = 120_000       # recorte para no mandar PDFs gigantes al modelo
 
 app = FastAPI(title="GPT Proxy", version="3.5-pdf")
 
 # -------------------------------------------------
-# Rutas
-# Estructura: /app/gpt-proxy/app/main.py
-# Queremos BASE_DIR = /app/gpt-proxy
+# Rutas (TU estructura real)
+# gpt-proxy/app/main.py
+# gpt-proxy/app/static/index.html
 # -------------------------------------------------
-APP_DIR = os.path.dirname(os.path.abspath(__file__))        # /app/gpt-proxy/app
-BASE_DIR = os.path.dirname(APP_DIR)                         # /app/gpt-proxy
-STATIC_DIR = os.path.join(BASE_DIR, "static")               # /app/gpt-proxy/static
+APP_DIR = os.path.dirname(os.path.abspath(__file__))   # .../gpt-proxy/app
+BASE_DIR = APP_DIR                                    # ✅ base = gpt-proxy/app
+STATIC_DIR = os.path.join(BASE_DIR, "static")          # ✅ gpt-proxy/app/static
 
 
 # -------------------------------------------------
@@ -61,9 +61,11 @@ def read_pdf_text(pdf_bytes: bytes) -> str:
             t = page.extract_text() or ""
             if t.strip():
                 parts.append(t)
+
         text = "\n\n".join(parts).strip()
         if not text:
             return ""
+
         if len(text) > MAX_PDF_TEXT_CHARS:
             text = text[:MAX_PDF_TEXT_CHARS] + "\n\n[...texto recortado por tamaño...]"
         return text
@@ -76,17 +78,17 @@ def read_pdf_text(pdf_bytes: bytes) -> str:
 # -------------------------------------------------
 @app.get("/")
 def frontend():
-    # 1) /app/gpt-proxy/static/index.html
+    # Prioridad: gpt-proxy/app/static/index.html
     index_static = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_static):
         return FileResponse(index_static)
 
-    # 2) Fallback: /app/gpt-proxy/index.html
+    # Fallback: gpt-proxy/app/index.html (por si algún día lo pones ahí)
     index_root = os.path.join(BASE_DIR, "index.html")
     if os.path.exists(index_root):
         return FileResponse(index_root)
 
-    raise HTTPException(status_code=404, detail="No existe index.html ni en /static ni en la raíz de gpt-proxy")
+    raise HTTPException(status_code=404, detail="No existe index.html en app/static ni en app/")
 
 
 @app.get("/health")
@@ -110,6 +112,7 @@ def infer(payload: InferenceIn):
         content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
         total_bytes = 0
 
+        # Procesar imágenes si vienen
         if payload.images:
             for img in payload.images:
                 if not img.image_b64 or not img.image_b64.strip():
@@ -147,6 +150,7 @@ def infer(payload: InferenceIn):
 
 @app.post("/summarize_pdf")
 async def summarize_pdf(file: UploadFile = File(...)):
+    # Validación básica
     if not file:
         raise HTTPException(status_code=400, detail="Falta el archivo PDF")
     if file.content_type not in ("application/pdf", "application/octet-stream"):
