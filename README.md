@@ -11,4 +11,4 @@ La API key se lee desde `OPENAI_API_KEY` (inyectada por Secret Manager en Cloud 
 - `MODEL` (opcional): por defecto `gpt-4o-mini`. Puedes usar `gpt-3.5-turbo` si prefieres.
 - `OPENAI_API_KEY`: **no** debe ir en el repo; se configura con Secret Manager.
 
-## Run local
+## Run local 
