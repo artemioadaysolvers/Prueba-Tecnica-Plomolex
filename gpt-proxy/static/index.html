@@ -5,20 +5,24 @@
   <title>IA - Hello World</title>
   <style>
     body { margin:0; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fff; font-family:Arial, Helvetica, sans-serif; }
-    h1 { color:red; font-size:36px; }
-    .container { display:flex; flex-direction:column; align-items:center; gap:10px; width:90%; max-width:700px; }
+    h1 { color:red; font-size:36px; margin-bottom:14px; }
+    .container { display:flex; flex-direction:column; align-items:center; gap:10px; width:90%; max-width:720px; }
     input[type="text"] { width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; font-size:16px; }
     button { padding:10px 18px; font-size:16px; background:#007bff; color:#fff; border:none; border-radius:6px; cursor:pointer; }
     button:hover { background:#0056b3; }
-    .result { width:100%; margin-top:10px; padding:12px; border:1px solid #ccc; border-radius:6px; min-height:120px; background:#f8f8f8; white-space:pre-wrap; }
+    .result { width:100%; margin-top:10px; padding:12px; border:1px solid #ccc; border-radius:6px; min-height:140px; background:#f8f8f8; white-space:pre-wrap; }
+    .hint { font-size:12px; opacity:.7; margin-top:6px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>IA - Hello World</h1>
+
     <input type="text" id="userInput" placeholder="Escribe algo..." />
     <button onclick="submitText()">Enviar</button>
+
     <div class="result" id="resultContainer"></div>
+    <div class="hint">Usa /health para verificar estado del servicio.</div>
   </div>
 
   <script>
