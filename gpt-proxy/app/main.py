@@ -8,9 +8,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from openai import OpenAI
 
-# -----------------------------
-# Configuración
-# -----------------------------
 MODEL = os.getenv("MODEL", "gpt-4.1-mini")
 MAX_REQ_BYTES = 32 * 1024 * 1024  # 32 MiB
 
@@ -21,9 +18,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../gp
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 
-# -----------------------------
-# Modelos Pydantic
-# -----------------------------
 class ImageInput(BaseModel):
     image_b64: str = Field(..., description="Imagen en base64 (sin prefijo data:)")
     mime: Optional[str] = Field(None, description="MIME type, ej: image/jpeg, image/png")
@@ -34,12 +28,8 @@ class InferenceIn(BaseModel):
     images: Optional[List[ImageInput]] = Field(default=None, description="Lista de imágenes en base64")
 
 
-# -----------------------------
-# Endpoints
-# -----------------------------
 @app.get("/")
 def frontend():
-    """Sirve el frontend HTML."""
     index_path = os.path.join(STATIC_DIR, "index.html")
     if not os.path.exists(index_path):
         raise HTTPException(status_code=404, detail="static/index.html no existe en la imagen")
@@ -48,20 +38,17 @@ def frontend():
 
 @app.get("/health")
 def health():
-    """Healthcheck (no exige API key, así puedes ver el frontend aunque falte)."""
     return {
         "status": "ok",
         "model": MODEL,
         "has_openai_key": bool(os.getenv("OPENAI_API_KEY")),
         "static_dir": STATIC_DIR,
-        "static_exists": os.path.exists(STATIC_DIR),
         "index_exists": os.path.exists(os.path.join(STATIC_DIR, "index.html")),
     }
 
 
 @app.post("/infer")
 def infer(payload: InferenceIn):
-    """Procesa texto (y opcionalmente imágenes) y devuelve JSON con output."""
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY no está configurada en Cloud Run.")
 
@@ -71,7 +58,6 @@ def infer(payload: InferenceIn):
         content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
         total_bytes = 0
 
-        # Procesar lista de imágenes (si hay)
         if payload.images:
             for img in payload.images:
                 if not img.image_b64 or not img.image_b64.strip():
@@ -86,7 +72,6 @@ def infer(payload: InferenceIn):
                 if total_bytes > MAX_REQ_BYTES:
                     raise HTTPException(status_code=413, detail="Demasiados datos (~>32 MiB en total).")
 
-                # Detectar mime si no viene (best effort)
                 if not img.mime:
                     import imghdr
                     fmt = imghdr.what(None, h=img_bytes)
