@@ -1,4 +1,6 @@
-import os, base64, binascii
+import os
+import base64
+import binascii
 from typing import Optional, Dict, Any, List
 
 from fastapi import FastAPI, HTTPException
@@ -6,44 +8,60 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from openai import OpenAI
 
-MODEL = os.getenv("MODEL", "gpt-4.1-mini")  # puedes cambiarlo por env var
+# -----------------------------
+# Configuración
+# -----------------------------
+MODEL = os.getenv("MODEL", "gpt-4.1-mini")
 MAX_REQ_BYTES = 32 * 1024 * 1024  # 32 MiB
 
-app = FastAPI(title="GPT Proxy", version="3.2-with-frontend")
+app = FastAPI(title="GPT Proxy", version="3.2-frontend-json")
 
-# --- Rutas absolutas robustas ---
+# __file__ = .../gpt-proxy/app/main.py
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../gpt-proxy
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-# --- Modelos ---
+
+# -----------------------------
+# Modelos Pydantic
+# -----------------------------
 class ImageInput(BaseModel):
     image_b64: str = Field(..., description="Imagen en base64 (sin prefijo data:)")
     mime: Optional[str] = Field(None, description="MIME type, ej: image/jpeg, image/png")
+
 
 class InferenceIn(BaseModel):
     text: str
     images: Optional[List[ImageInput]] = Field(default=None, description="Lista de imágenes en base64")
 
 
+# -----------------------------
+# Endpoints
+# -----------------------------
 @app.get("/")
 def frontend():
-    path = os.path.join(STATIC_DIR, "index.html")
-    if not os.path.exists(path):
+    """Sirve el frontend HTML."""
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if not os.path.exists(index_path):
         raise HTTPException(status_code=404, detail="static/index.html no existe en la imagen")
-    return FileResponse(path)
+    return FileResponse(index_path)
 
 
 @app.get("/health")
 def health():
-    # No exige API key para salud / frontend
-    return {"status": "ok", "model": MODEL, "has_openai_key": bool(os.getenv("OPENAI_API_KEY"))}
+    """Healthcheck (no exige API key)."""
+    return {
+        "status": "ok",
+        "model": MODEL,
+        "has_openai_key": bool(os.getenv("OPENAI_API_KEY")),
+        "static_dir": STATIC_DIR,
+    }
 
 
 @app.post("/infer")
 def infer(payload: InferenceIn):
-    # Exigir API key SOLO cuando se usa IA
+    """Procesa texto (y opcionalmente imágenes) y devuelve JSON con output."""
     if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY no está configurada en Cloud Run")
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY no está configurada en Cloud Run.")
 
     client = OpenAI()
 
@@ -53,7 +71,7 @@ def infer(payload: InferenceIn):
 
         if payload.images:
             for img in payload.images:
-                if not img.image_b64.strip():
+                if not img.image_b64 or not img.image_b64.strip():
                     continue
 
                 try:
