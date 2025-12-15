@@ -1,4 +1,4 @@
-import os 
+import os
 import base64
 import binascii
 from typing import Optional, Dict, Any, List
@@ -48,12 +48,14 @@ def frontend():
 
 @app.get("/health")
 def health():
-    """Healthcheck (no exige API key)."""
+    """Healthcheck (no exige API key, así puedes ver el frontend aunque falte)."""
     return {
         "status": "ok",
         "model": MODEL,
         "has_openai_key": bool(os.getenv("OPENAI_API_KEY")),
         "static_dir": STATIC_DIR,
+        "static_exists": os.path.exists(STATIC_DIR),
+        "index_exists": os.path.exists(os.path.join(STATIC_DIR, "index.html")),
     }
 
 
@@ -69,6 +71,7 @@ def infer(payload: InferenceIn):
         content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
         total_bytes = 0
 
+        # Procesar lista de imágenes (si hay)
         if payload.images:
             for img in payload.images:
                 if not img.image_b64 or not img.image_b64.strip():
@@ -83,6 +86,7 @@ def infer(payload: InferenceIn):
                 if total_bytes > MAX_REQ_BYTES:
                     raise HTTPException(status_code=413, detail="Demasiados datos (~>32 MiB en total).")
 
+                # Detectar mime si no viene (best effort)
                 if not img.mime:
                     import imghdr
                     fmt = imghdr.what(None, h=img_bytes)
