@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>IA - Hello World</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    h1 {
+      color: red;
+      font-size: 36px;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      width: 300px;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 80%;
+      max-width: 600px;
+      min-height: 100px;
+      background-color: #f8f8f8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>IA - Hello World</h1>
+
+    <!-- Formulario -->
+    <input type="text" id="userInput" placeholder="Escribe algo..." />
+
+    <button onclick="submitText()">Enviar</button>
+
+    <!-- Resultado -->
+    <div class="result" id="resultContainer"></div>
+  </div>
+
+  <script>
+    async function submitText() {
+      const inputText = document.getElementById("userInput").value;
+
+      if (!inputText) {
+        alert("Por favor, ingresa algún texto.");
+        return;
+      }
+
+      // Muestra que se está procesando
+      document.getElementById("resultContainer").innerHTML = "Procesando...";
+
+      try {
+        const response = await fetch("/infer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: inputText }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Error al procesar el texto");
+        }
+
+        const data = await response.json();
+        const outputText = data.output || "No se pudo generar una respuesta.";
+
+        document.getElementById("resultContainer").innerHTML = outputText;
+      } catch (error) {
+        document.getElementById("resultContainer").innerHTML = "Error al procesar: " + error.message;
+      }
+    }
+  </script>
+</body>
+</html>
