@@ -1,113 +1,103 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>IA - Hello World</title>
-  <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: #ffffff;
-      font-family: Arial, Helvetica, sans-serif;
-    }
+import os
+import base64
+import binascii
+from typing import Optional, Dict, Any, List
 
-    h1 {
-      color: red;
-      font-size: 36px;
-    }
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from openai import OpenAI
 
-    .container {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-    }
+# -----------------------------
+# Configuración
+# -----------------------------
+MODEL = os.getenv("MODEL", "gpt-4.1-mini")
+MAX_REQ_BYTES = 32 * 1024 * 1024  # 32 MiB
 
-    input[type="text"] {
-      width: 300px;
-      padding: 10px;
-      margin: 10px 0;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 16px;
-    }
+app = FastAPI(title="GPT Proxy", version="3.2-frontend-json")
 
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
+# Rutas robustas (funciona en Docker/Cloud Run)
+# __file__ = .../gpt-proxy/app/main.py
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../gpt-proxy
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-    button:hover {
-      background-color: #0056b3;
-    }
 
-    .result {
-      margin-top: 20px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      width: 80%;
-      max-width: 600px;
-      min-height: 100px;
-      background-color: #f8f8f8;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>IA - Hello World</h1>
+# -----------------------------
+# Modelos Pydantic
+# -----------------------------
+class ImageInput(BaseModel):
+    image_b64: str = Field(..., description="Imagen en base64 (sin prefijo data:)")
+    mime: Optional[str] = Field(None, description="MIME type, ej: image/jpeg, image/png")
 
-    <!-- Formulario -->
-    <input type="text" id="userInput" placeholder="Escribe algo..." />
 
-    <button onclick="submitText()">Enviar</button>
+class InferenceIn(BaseModel):
+    text: str
+    images: Optional[List[ImageInput]] = Field(default=None, description="Lista de imágenes en base64")
 
-    <!-- Resultado -->
-    <div class="result" id="resultContainer"></div>
-  </div>
 
-  <script>
-    async function submitText() {
-      const inputText = document.getElementById("userInput").value;
+# -----------------------------
+# Endpoints
+# -----------------------------
+@app.get("/")
+def frontend():
+    """Sirve el frontend HTML."""
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if not os.path.exists(index_path):
+        raise HTTPException(status_code=404, detail="No existe gpt-proxy/static/index.html en la imagen.")
+    return FileResponse(index_path)
 
-      if (!inputText) {
-        alert("Por favor, ingresa algún texto.");
-        return;
-      }
 
-      // Muestra que se está procesando
-      document.getElementById("resultContainer").innerHTML = "Procesando...";
+@app.get("/health")
+def health():
+    """Healthcheck (no exige API key, así puedes ver el frontend aunque falte)."""
+    return {"status": "ok", "model": MODEL, "has_openai_key": bool(os.getenv("OPENAI_API_KEY"))}
 
-      try {
-        const response = await fetch("/infer", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ text: inputText }),
-        });
 
-        if (!response.ok) {
-          throw new Error("Error al procesar el texto");
-        }
+@app.post("/infer")
+def infer(payload: InferenceIn):
+    """Procesa texto (y opcionalmente imágenes) y devuelve JSON con output."""
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY no está configurada en Cloud Run.")
 
-        const data = await response.json();
-        const outputText = data.output || "No se pudo generar una respuesta.";
+    client = OpenAI()
 
-        document.getElementById("resultContainer").innerHTML = outputText;
-      } catch (error) {
-        document.getElementById("resultContainer").innerHTML = "Error al procesar: " + error.message;
-      }
-    }
-  </script>
-</body>
-</html>
+    try:
+        content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
+        total_bytes = 0
+
+        # Procesar lista de imágenes (si hay)
+        if payload.images:
+            for img in payload.images:
+                if not img.image_b64 or not img.image_b64.strip():
+                    continue
+
+                try:
+                    img_bytes = base64.b64decode(img.image_b64, validate=True)
+                except binascii.Error:
+                    raise HTTPException(status_code=400, detail="Una de las imágenes no es base64 válida.")
+
+                total_bytes += len(img_bytes)
+                if total_bytes > MAX_REQ_BYTES:
+                    raise HTTPException(status_code=413, detail="Demasiados datos (~>32 MiB en total).")
+
+                # Detectar mime si no viene (best effort)
+                if not img.mime:
+                    import imghdr
+                    fmt = imghdr.what(None, h=img_bytes)
+                    img.mime = f"image/{fmt}" if fmt else "application/octet-stream"
+
+                data_url = f"data:{img.mime};base64,{img.image_b64}"
+                content.append({"type": "input_image", "image_url": data_url})
+
+        resp = client.responses.create(
+            model=MODEL,
+            input=[{"role": "user", "content": content}],
+        )
+
+        # ✅ JSON compatible con tu frontend
+        return {"output": resp.output_text}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference error: {e}")
