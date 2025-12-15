@@ -1,5 +1,5 @@
 # GPT Proxy (Cloud Run)
-
+ 
 Servicio HTTP que recibe texto y devuelve la respuesta de OpenAI con un modelo fijado por env var `MODEL`.
 La API key se lee desde `OPENAI_API_KEY` (inyectada por Secret Manager en Cloud Run).
 
