@@ -20,9 +20,14 @@ MAX_PDF_TEXT_CHARS = 120_000       # recorte para no mandar PDFs gigantes al mod
 
 app = FastAPI(title="GPT Proxy", version="3.5-pdf")
 
-# Rutas robustas (para este repo donde main.py está en /app/main.py)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # /app
-STATIC_DIR = os.path.join(BASE_DIR, "static")          # /app/static
+# -------------------------------------------------
+# Rutas
+# Estructura: /app/gpt-proxy/app/main.py
+# Queremos BASE_DIR = /app/gpt-proxy
+# -------------------------------------------------
+APP_DIR = os.path.dirname(os.path.abspath(__file__))        # /app/gpt-proxy/app
+BASE_DIR = os.path.dirname(APP_DIR)                         # /app/gpt-proxy
+STATIC_DIR = os.path.join(BASE_DIR, "static")               # /app/gpt-proxy/static
 
 
 # -------------------------------------------------
@@ -71,17 +76,17 @@ def read_pdf_text(pdf_bytes: bytes) -> str:
 # -------------------------------------------------
 @app.get("/")
 def frontend():
-    # 1) Prioridad: /app/static/index.html
+    # 1) /app/gpt-proxy/static/index.html
     index_static = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_static):
         return FileResponse(index_static)
 
-    # 2) Fallback: /app/index.html
+    # 2) Fallback: /app/gpt-proxy/index.html
     index_root = os.path.join(BASE_DIR, "index.html")
     if os.path.exists(index_root):
         return FileResponse(index_root)
 
-    raise HTTPException(status_code=404, detail="No existe index.html ni en /static ni en la raíz")
+    raise HTTPException(status_code=404, detail="No existe index.html ni en /static ni en la raíz de gpt-proxy")
 
 
 @app.get("/health")
@@ -105,7 +110,6 @@ def infer(payload: InferenceIn):
         content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
         total_bytes = 0
 
-        # Procesar imágenes si vienen
         if payload.images:
             for img in payload.images:
                 if not img.image_b64 or not img.image_b64.strip():
@@ -143,7 +147,6 @@ def infer(payload: InferenceIn):
 
 @app.post("/summarize_pdf")
 async def summarize_pdf(file: UploadFile = File(...)):
-    # Validación básica
     if not file:
         raise HTTPException(status_code=400, detail="Falta el archivo PDF")
     if file.content_type not in ("application/pdf", "application/octet-stream"):
