@@ -2,36 +2,47 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>IA - Hello World</title>
+  <title>IA - PDF Resumen</title>
   <style>
-    body { margin:0; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fff; font-family:Arial, Helvetica, sans-serif; }
-    h1 { color:red; font-size:36px; margin-bottom:14px; }
-    .container { display:flex; flex-direction:column; align-items:center; gap:10px; width:90%; max-width:720px; }
+    body { margin:0; min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fff; font-family:Arial, Helvetica, sans-serif; }
+    h1 { color:red; font-size:32px; margin-bottom:14px; }
+    .container { display:flex; flex-direction:column; align-items:center; gap:12px; width:90%; max-width:820px; }
+    .row { width:100%; display:flex; gap:10px; align-items:center; }
     input[type="text"] { width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; font-size:16px; }
+    input[type="file"] { width:100%; }
     button { padding:10px 18px; font-size:16px; background:#007bff; color:#fff; border:none; border-radius:6px; cursor:pointer; }
     button:hover { background:#0056b3; }
-    .result { width:100%; margin-top:10px; padding:12px; border:1px solid #ccc; border-radius:6px; min-height:140px; background:#f8f8f8; white-space:pre-wrap; }
+    .result { width:100%; margin-top:10px; padding:12px; border:1px solid #ccc; border-radius:6px; min-height:160px; background:#f8f8f8; white-space:pre-wrap; }
     .hint { font-size:12px; opacity:.7; margin-top:6px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>IA - Hello World</h1>
+    <h1>IA - Resumen de PDF</h1>
 
-    <input type="text" id="userInput" placeholder="Escribe algo..." />
-    <button onclick="submitText()">Enviar</button>
+    <!-- Texto normal (tu endpoint existente /infer) -->
+    <div class="row">
+      <input type="text" id="userInput" placeholder="Escribe algo..." />
+      <button onclick="submitText()">Enviar</button>
+    </div>
+
+    <!-- PDF -> /summarize_pdf -->
+    <div class="row">
+      <input type="file" id="pdfFile" accept="application/pdf" />
+      <button onclick="submitPdf()">Resumen PDF</button>
+    </div>
 
     <div class="result" id="resultContainer"></div>
-    <div class="hint">Usa /health para verificar estado del servicio.</div>
+    <div class="hint">Tip: /health para verificar estado del servicio.</div>
   </div>
 
   <script>
+    const out = () => document.getElementById("resultContainer");
+
     async function submitText() {
       const inputText = document.getElementById("userInput").value.trim();
       if (!inputText) { alert("Por favor, ingresa algún texto."); return; }
-
-      const out = document.getElementById("resultContainer");
-      out.textContent = "Procesando...";
+      out().textContent = "Procesando...";
 
       try {
         const r = await fetch("/infer", {
@@ -42,10 +53,33 @@
 
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || "Error al procesar el texto");
-
-        out.textContent = data.output ?? "(sin output)";
+        out().textContent = data.output ?? "(sin output)";
       } catch (e) {
-        out.textContent = "Error: " + e.message;
+        out().textContent = "Error: " + e.message;
+      }
+    }
+
+    async function submitPdf() {
+      const f = document.getElementById("pdfFile").files?.[0];
+      if (!f) { alert("Selecciona un PDF primero."); return; }
+
+      out().textContent = "Leyendo PDF y generando resumen...";
+
+      try {
+        const form = new FormData();
+        form.append("file", f, f.name);
+
+        const r = await fetch("/summarize_pdf", {
+          method: "POST",
+          body: form
+        });
+
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || "Error al resumir el PDF");
+
+        out().textContent = data.summary ?? "(sin summary)";
+      } catch (e) {
+        out().textContent = "Error: " + e.message;
       }
     }
   </script>
