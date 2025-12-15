@@ -14,5 +14,4 @@ RUN mkdir -p /app/static && \
 ENV PORT=8080
 EXPOSE 8080
 
-# Mejor usar ENTRYPOINT para iniciar el proceso
-ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
