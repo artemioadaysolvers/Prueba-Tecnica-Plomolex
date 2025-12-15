@@ -1,17 +1,17 @@
-# Usamos una imagen base de Python
 FROM python:3.9-slim
 
-# Establecemos el directorio de trabajo
 WORKDIR /app
 
-# Copiamos todo el contenido de la carpeta gpt-proxy al contenedor
 COPY . .
 
-# Instalamos las dependencias
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Exponemos el puerto donde se ejecutará el servidor
+# (Opcional pero recomendado) que exista /static para el frontend
+RUN mkdir -p /app/static && \
+    if [ -f /app/index.html ]; then cp /app/index.html /app/static/index.html; fi
+
+# Cloud Run usa la variable PORT
+ENV PORT=8080
 EXPOSE 8080
 
-# Comando para ejecutar el servidor FastAPI
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
