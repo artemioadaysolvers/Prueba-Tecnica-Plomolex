@@ -18,12 +18,11 @@ MODEL = os.getenv("MODEL", "gpt-4.1-mini")
 MAX_REQ_BYTES = 32 * 1024 * 1024  # 32 MiB
 MAX_PDF_TEXT_CHARS = 120_000       # recorte para no mandar PDFs gigantes al modelo
 
-app = FastAPI(title="GPT Proxy", version="3.4-pdf")
+app = FastAPI(title="GPT Proxy", version="3.5-pdf")
 
-# Rutas robustas
-# __file__ = .../gpt-proxy/app/main.py
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../gpt-proxy
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+# Rutas robustas (para este repo donde main.py está en /app/main.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # /app
+STATIC_DIR = os.path.join(BASE_DIR, "static")          # /app/static
 
 
 # -------------------------------------------------
@@ -72,12 +71,12 @@ def read_pdf_text(pdf_bytes: bytes) -> str:
 # -------------------------------------------------
 @app.get("/")
 def frontend():
-    # 1) Prioridad: static/index.html (como tu código original)
+    # 1) Prioridad: /app/static/index.html
     index_static = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_static):
         return FileResponse(index_static)
 
-    # 2) Fallback: index.html en la raíz del repo (útil si no copiaste a /static)
+    # 2) Fallback: /app/index.html
     index_root = os.path.join(BASE_DIR, "index.html")
     if os.path.exists(index_root):
         return FileResponse(index_root)
@@ -91,6 +90,7 @@ def health():
         "status": "ok",
         "model": MODEL,
         "has_openai_key": bool(os.getenv("OPENAI_API_KEY")),
+        "base_dir": BASE_DIR,
         "static_dir": STATIC_DIR,
         "static_index_exists": os.path.exists(os.path.join(STATIC_DIR, "index.html")),
         "root_index_exists": os.path.exists(os.path.join(BASE_DIR, "index.html")),
@@ -102,10 +102,7 @@ def infer(payload: InferenceIn):
     client = get_openai_client()
 
     try:
-        content: List[Dict[str, Any]] = [
-            {"type": "input_text", "text": payload.text}
-        ]
-
+        content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
         total_bytes = 0
 
         # Procesar imágenes si vienen
