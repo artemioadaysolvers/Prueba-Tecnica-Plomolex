@@ -1,103 +1,49 @@
-import os
-import base64
-import binascii
-from typing import Optional, Dict, Any, List
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>IA - Hello World</title>
+  <style>
+    body { margin:0; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fff; font-family:Arial, Helvetica, sans-serif; }
+    h1 { color:red; font-size:36px; }
+    .container { display:flex; flex-direction:column; align-items:center; gap:10px; width:90%; max-width:700px; }
+    input[type="text"] { width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; font-size:16px; }
+    button { padding:10px 18px; font-size:16px; background:#007bff; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+    button:hover { background:#0056b3; }
+    .result { width:100%; margin-top:10px; padding:12px; border:1px solid #ccc; border-radius:6px; min-height:120px; background:#f8f8f8; white-space:pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>IA - Hello World</h1>
+    <input type="text" id="userInput" placeholder="Escribe algo..." />
+    <button onclick="submitText()">Enviar</button>
+    <div class="result" id="resultContainer"></div>
+  </div>
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-from openai import OpenAI
+  <script>
+    async function submitText() {
+      const inputText = document.getElementById("userInput").value.trim();
+      if (!inputText) { alert("Por favor, ingresa algún texto."); return; }
 
-# -----------------------------
-# Configuración
-# -----------------------------
-MODEL = os.getenv("MODEL", "gpt-4.1-mini")
-MAX_REQ_BYTES = 32 * 1024 * 1024  # 32 MiB
+      const out = document.getElementById("resultContainer");
+      out.textContent = "Procesando...";
 
-app = FastAPI(title="GPT Proxy", version="3.2-frontend-json")
+      try {
+        const r = await fetch("/infer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: inputText })
+        });
 
-# Rutas robustas (funciona en Docker/Cloud Run)
-# __file__ = .../gpt-proxy/app/main.py
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../gpt-proxy
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || "Error al procesar el texto");
 
-
-# -----------------------------
-# Modelos Pydantic
-# -----------------------------
-class ImageInput(BaseModel):
-    image_b64: str = Field(..., description="Imagen en base64 (sin prefijo data:)")
-    mime: Optional[str] = Field(None, description="MIME type, ej: image/jpeg, image/png")
-
-
-class InferenceIn(BaseModel):
-    text: str
-    images: Optional[List[ImageInput]] = Field(default=None, description="Lista de imágenes en base64")
-
-
-# -----------------------------
-# Endpoints
-# -----------------------------
-@app.get("/")
-def frontend():
-    """Sirve el frontend HTML."""
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if not os.path.exists(index_path):
-        raise HTTPException(status_code=404, detail="No existe gpt-proxy/static/index.html en la imagen.")
-    return FileResponse(index_path)
-
-
-@app.get("/health")
-def health():
-    """Healthcheck (no exige API key, así puedes ver el frontend aunque falte)."""
-    return {"status": "ok", "model": MODEL, "has_openai_key": bool(os.getenv("OPENAI_API_KEY"))}
-
-
-@app.post("/infer")
-def infer(payload: InferenceIn):
-    """Procesa texto (y opcionalmente imágenes) y devuelve JSON con output."""
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY no está configurada en Cloud Run.")
-
-    client = OpenAI()
-
-    try:
-        content: List[Dict[str, Any]] = [{"type": "input_text", "text": payload.text}]
-        total_bytes = 0
-
-        # Procesar lista de imágenes (si hay)
-        if payload.images:
-            for img in payload.images:
-                if not img.image_b64 or not img.image_b64.strip():
-                    continue
-
-                try:
-                    img_bytes = base64.b64decode(img.image_b64, validate=True)
-                except binascii.Error:
-                    raise HTTPException(status_code=400, detail="Una de las imágenes no es base64 válida.")
-
-                total_bytes += len(img_bytes)
-                if total_bytes > MAX_REQ_BYTES:
-                    raise HTTPException(status_code=413, detail="Demasiados datos (~>32 MiB en total).")
-
-                # Detectar mime si no viene (best effort)
-                if not img.mime:
-                    import imghdr
-                    fmt = imghdr.what(None, h=img_bytes)
-                    img.mime = f"image/{fmt}" if fmt else "application/octet-stream"
-
-                data_url = f"data:{img.mime};base64,{img.image_b64}"
-                content.append({"type": "input_image", "image_url": data_url})
-
-        resp = client.responses.create(
-            model=MODEL,
-            input=[{"role": "user", "content": content}],
-        )
-
-        # ✅ JSON compatible con tu frontend
-        return {"output": resp.output_text}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference error: {e}")
+        out.textContent = data.output ?? "(sin output)";
+      } catch (e) {
+        out.textContent = "Error: " + e.message;
+      }
+    }
+  </script>
+</body>
+</html>
